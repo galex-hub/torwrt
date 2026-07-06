@@ -9,6 +9,8 @@
 - Errors: fail loud and early — `die() { echo "torwrt: $*" >&2; exit 1; }`.
 - Installer and CLI actions must be idempotent (re-run = repair/update, never breaks).
 - Comments in code: English, only for non-obvious constraints.
+- **All user-facing text is English only** — LuCI UI strings, installer/CLI output,
+  README. Never mix languages.
 
 ## LuCI JS / JSON
 - JS: LuCI idioms only (see [luci.md](luci.md)); `'use strict';` first line; tabs.

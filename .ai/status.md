@@ -2,9 +2,8 @@
 Updated: 2026-07-07
 
 ## State
-**MVP implemented end-to-end, not yet tested on hardware.** Installer, backend lib,
-rpcd plugin, CLI and the LuCI page are all real code now. Owner will test on a live
-router (install + UI). Nothing committed/pushed yet — owner triggers commits explicitly.
+**MVP installed successfully on a live router** (rockchip/aarch64, 25.12.4) after the
+network fixes below. UI functionality feedback pending from the owner.
 
 ## Done
 - 2026-07-06 — project structure, `.ai/` docs, stub files, git init.
@@ -19,16 +18,21 @@ router (install + UI). Nothing committed/pushed yet — owner triggers commits e
 - 2026-07-07 — first live test (rockchip/aarch64): tarball fetch OK, but `apk update`
   failed — apk spawns its own wget without `-4`. Fix: deps skipped when binaries
   already present + apk runs under a PATH-interposed `wget -4` wrapper. VERSION 0.2.2.
-  Retest pending; if apk still fails with `-4`, downloads.openwrt.org is unreachable
-  from that network → mirror support would be the next move.
+- 2026-07-07 — second live test: apk failed once more even with the wrapper (manual
+  `wget -4` to the feed worked), then **install succeeded** — feed connectivity is
+  flaky. Installer hardened: connectivity preflight for every required resource
+  before touching the system (clean abort otherwise), IPv4 preferred with automatic
+  fallback to system default, apk retries, green SUCCESS summary with
+  installed-vs-updated versions. Added `torwrt uninstall` (clean removal, tor/curl
+  left untouched). All user-facing text switched to English (README rewritten).
+  VERSION 0.3.0.
 
-## Verify on the router (first live test)
-1. Install command from README on OpenWrt >= 25.12.4.
-2. `ubus list | grep luci.torwrt` — object present; `ubus call luci.torwrt status '{}'`.
-3. tor logs actually land in syslog as ` Tor[pid]:` (bootstrap parsing depends on it;
-   if the tag differs, fix the grep in `twrt_logs_text`/`twrt_bootstrap_read`).
-4. LuCI page appears under Services after hard refresh; buttons + check work.
-5. Re-run installer: config preserved, no errors (idempotency).
+## Verify on the router (remaining)
+1. LuCI page under Services: status/bootstrap correct, logs shown, buttons + check work
+   (tor must log to syslog as ` Tor[pid]:` for bootstrap parsing — if the tag differs,
+   fix the grep in `twrt_logs_text`/`twrt_bootstrap_read`).
+2. Re-run installer: reports "updated OLD -> NEW", config preserved, green summary.
+3. `torwrt uninstall`: menu entry gone, files gone, tor still running; reinstall works.
 
 ## Next steps
 1. Commit + push (owner's call), owner tests on router, fix findings.

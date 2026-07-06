@@ -108,6 +108,27 @@ twrt_curl_error() {
 	esac
 }
 
+# clean torwrt removal; the tor daemon and installed packages stay untouched
+twrt_uninstall() {
+	if [ -x /etc/init.d/torwrt ]; then
+		/etc/init.d/torwrt stop >/dev/null 2>&1
+		/etc/init.d/torwrt disable >/dev/null 2>&1
+	fi
+	rm -f /etc/init.d/torwrt \
+		/etc/config/torwrt \
+		/usr/bin/torwrt \
+		/usr/libexec/rpcd/luci.torwrt \
+		/usr/share/luci/menu.d/luci-app-torwrt.json \
+		/usr/share/rpcd/acl.d/luci-app-torwrt.json \
+		"$TORWRT_TORVER_CACHE"
+	rm -rf /usr/lib/torwrt /www/luci-static/resources/view/torwrt
+	/etc/init.d/rpcd restart >/dev/null 2>&1
+	# clear LuCI caches so the menu entry disappears right away
+	rm -f /tmp/luci-indexcache*
+	rm -rf /tmp/luci-modulecache/
+	return 0
+}
+
 # live connectivity test: web request through the tor SOCKS proxy
 twrt_check_json() {
 	local addr port url t0 t1 rc resp istor ip

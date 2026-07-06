@@ -26,7 +26,7 @@ VERSION        current version, single line
 |---|---|---|
 | etc/init.d/torwrt | /etc/init.d/torwrt | no-op placeholder by design (future: fw wiring); tor runs under stock init |
 | etc/config/torwrt | /etc/config/torwrt | UCI config (options below) |
-| usr/bin/torwrt | /usr/bin/torwrt | CLI: status/logs/start/stop/restart/check/version |
+| usr/bin/torwrt | /usr/bin/torwrt | CLI: status/logs/start/stop/restart/check/version/uninstall |
 | usr/lib/torwrt/common.sh | /usr/lib/torwrt/common.sh | shared lib — all logic |
 | usr/libexec/rpcd/luci.torwrt | /usr/libexec/rpcd/luci.torwrt | rpcd plugin = ubus object `luci.torwrt` |
 | usr/share/luci/menu.d/luci-app-torwrt.json | same | LuCI menu: Services → Torwrt |
@@ -63,11 +63,15 @@ Implementation notes:
 
 ## Components
 - **install.sh** — self-contained (runs before anything is installed). Flow:
-  root/OpenWrt/version/clock checks → branch tarball into /tmp (tmpfs) →
-  deps (tor, curl): skipped entirely when binaries already present, otherwise
-  `apk update && apk add` under a PATH-interposed `wget -4` wrapper → copy `files/` tree to `/`
-  (existing /etc/config/torwrt preserved) → chmod executables → ensure tor
-  enabled+running → enable torwrt, restart rpcd, clear LuCI caches.
+  root/OpenWrt/version/clock checks → tarball into /tmp (tmpfs), tried with `-4`
+  first, falling back to system default; the working mode becomes `NET_FLAGS` for
+  everything after → if deps (tor, curl; checked by binary name) are missing,
+  probe downloads.openwrt.org and **abort cleanly before any system change** when
+  unreachable → `apk update`/`apk add` with retries, under a PATH-interposed wget
+  wrapper applying `NET_FLAGS` → copy `files/` tree to `/` (existing
+  /etc/config/torwrt preserved; previous version read first for the summary) →
+  chmod executables → ensure tor enabled+running → enable torwrt, restart rpcd,
+  clear LuCI caches → green SUCCESS summary ("installed" vs "updated OLD -> NEW").
   Env overrides: `TORWRT_BRANCH`, `TORWRT_FORCE=1` (skip version gate).
   Sysupgrade: only /etc/config/* survives by default; after a firmware upgrade the
   user re-runs the installer (code paths are deliberately not in sysupgrade.conf).

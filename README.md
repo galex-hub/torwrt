@@ -1,44 +1,56 @@
 # torwrt
 
-Управление Tor на роутере с OpenWrt: установка одной командой и страница в веб-интерфейсе
-LuCI (**Services → Torwrt**) — статус демона, логи, кнопки Start/Stop/Restart и проверка
-соединения через сеть Tor.
+Tor management for OpenWrt routers: one-command install and a LuCI web page
+(**Services → Torwrt**) with daemon status, logs, Start/Stop/Restart buttons and a
+live connectivity check through the Tor network.
 
-Текущая версия — база: управляет демоном Tor и показывает его состояние.
-Маршрутизация трафика через Tor появится в следующих версиях.
+The current version is the base: it controls and monitors the tor daemon.
+Routing traffic through Tor is planned for future releases.
 
-## Требования
+## Requirements
 
-- OpenWrt **25.12.4 или новее** (установщик проверит и откажется на старых версиях);
-- доступ в интернет с роутера;
-- несколько МБ свободного места (пакеты `tor` и `curl` ставятся автоматически).
+- OpenWrt **25.12.4 or newer** (the installer checks and refuses older releases);
+- internet access from the router;
+- a few MB of free flash (the `tor` and `curl` packages are installed automatically).
 
-## Установка и обновление
+## Install / update
 
-Зайдите на роутер по SSH и выполните:
+SSH into the router and run:
 
 ```sh
 wget -4 -O /tmp/torwrt-install.sh https://raw.githubusercontent.com/galex-hub/torwrt/main/install.sh
 sh /tmp/torwrt-install.sh
 ```
 
-Установщик сам проверит систему, доставит недостающие пакеты, скопирует файлы
-(на флеш попадают только рабочие файлы, без документации) и подключит страницу в LuCI.
-Обновление — та же команда; ваши настройки в `/etc/config/torwrt` сохраняются.
+The installer verifies the system, confirms that every required server is reachable
+(and aborts cleanly, changing nothing, if one is not), installs missing packages,
+copies only the runtime files to flash and wires up the LuCI page.
 
-## Использование
+Re-running the same command updates torwrt; your `/etc/config/torwrt` settings
+are preserved.
 
-- **LuCI → Services → Torwrt** — статус (запущен ли демон, процент bootstrap),
-  журнал, кнопки управления и «Check connection» (живой запрос через Tor,
-  показывает выходной IP; занимает до ~15 секунд).
-- Из консоли: `torwrt status | logs | start | stop | restart | check`.
-- Настройки: `/etc/config/torwrt` (адрес/порт SOCKS, URL проверки, число строк лога).
+## Usage
 
-## Заметки
+- **LuCI → Services → Torwrt** — daemon status and bootstrap progress, log viewer,
+  control buttons and "Check connection" (a live request through Tor showing the
+  exit IP; takes up to ~15 seconds).
+- CLI: `torwrt status | logs | start | stop | restart | check | version`.
+- Settings: `/etc/config/torwrt` (SOCKS address/port, check URL, log lines).
 
-- Если пункт меню не появился сразу — обновите страницу LuCI жёстко (Ctrl+F5).
-- После перепрошивки роутера установку нужно выполнить заново
-  (настройки в `/etc/config/torwrt` при этом сохраняются штатными средствами OpenWrt).
+## Uninstall
+
+```sh
+torwrt uninstall
+```
+
+Removes torwrt completely (service, web page, config). The tor daemon and the
+installed packages are left untouched; to remove tor as well:
+`/etc/init.d/tor stop && apk del tor`.
+
+## Notes
+
+- If the menu item does not show up right away, hard-refresh the LuCI page (Ctrl+F5).
+- After a firmware upgrade (sysupgrade), run the installer again.
 
 ---
-Для разработчиков и AI-агентов: [AGENTS.md](AGENTS.md) → [.ai/](.ai/)
+For developers and AI agents: [AGENTS.md](AGENTS.md) → [.ai/](.ai/)

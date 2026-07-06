@@ -9,13 +9,14 @@ usage() {
 	cat <<EOF
 Usage: torwrt <command>
 
-  status    tor state as JSON (same data as the web UI)
-  logs      recent tor log lines
-  start     start the tor daemon
-  stop      stop the tor daemon
-  restart   restart the tor daemon
-  check     test connectivity through tor (web request), JSON result
-  version   torwrt version
+  status     tor state as JSON (same data as the web UI)
+  logs       recent tor log lines
+  start      start the tor daemon
+  stop       stop the tor daemon
+  restart    restart the tor daemon
+  check      test connectivity through tor (web request), JSON result
+  version    torwrt version
+  uninstall  cleanly remove torwrt (tor itself is left untouched)
 EOF
 	exit 1
 }
@@ -29,5 +30,11 @@ case "${1:-}" in
 	;;
 	check)   twrt_check_json ;;
 	version) twrt_version ;;
+	uninstall)
+		echo "torwrt: removing torwrt from the system (tor daemon and packages stay untouched)"
+		twrt_uninstall
+		echo "torwrt: uninstalled — the web page and service are gone"
+		echo "torwrt: tor is still installed; to remove it too: /etc/init.d/tor stop && apk del tor"
+	;;
 	*)       usage ;;
 esac

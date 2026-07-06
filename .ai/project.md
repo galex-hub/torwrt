@@ -41,5 +41,6 @@ Future (the skeleton must take these without rewriting the base — see
 | 2026-07-07 | Existing `/etc/config/torwrt` is never overwritten on update | user settings survive updates |
 | 2026-07-07 | tor lifecycle via stock `/etc/init.d/tor`, no own supervisor | package init already handles procd/user/torrc; no conflicts, no duplication |
 | 2026-07-07 | Classic shell rpcd plugin (not ucode) | plugin sources the shared shell lib directly — single source of logic |
-| 2026-07-07 | User README in Russian | primary audience; commands are copy-paste anyway |
-| 2026-07-07 | **All downloads are IPv4-only** (`wget -4`, `curl -4`) — hard rule for any future network call | half-configured IPv6 on routers stalls/breaks fetches; IPv4 is the dependable path |
+| 2026-07-07 | **All user-facing text is English** (README, UI, installer/CLI output) | owner's call after live test: no RU/EN mixing |
+| 2026-07-07 | Downloads prefer IPv4 (`-4`) with automatic fallback to system default | broken IPv6 stalls fetches, but IPv4-only must not brick installs where it is unavailable; installer probes and picks |
+| 2026-07-07 | Installer changes nothing until connectivity to every required resource is confirmed | no half-installed state, ever |
