@@ -1,0 +1,5 @@
+config torwrt 'main'
+	option socks_addr '127.0.0.1'
+	option socks_port '9050'
+	option check_url 'https://check.torproject.org/api/ip'
+	option log_lines '50'

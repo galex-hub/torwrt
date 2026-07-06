@@ -1,0 +1,2 @@
+# Router runs busybox ash: CRLF breaks scripts. Force LF everywhere.
+* text=auto eol=lf

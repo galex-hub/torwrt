@@ -1,0 +1,15 @@
+{
+	"luci-app-torwrt": {
+		"description": "Grant access to the torwrt UI backend",
+		"read": {
+			"ubus": {
+				"luci.torwrt": [ "status", "logs" ]
+			}
+		},
+		"write": {
+			"ubus": {
+				"luci.torwrt": [ "start", "stop", "restart", "check" ]
+			}
+		}
+	}
+}

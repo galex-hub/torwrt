@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "PowerShell(git init -b main 2>&1 | Select-Object -First 1; $files = @\\('install.sh', 'files/etc/init.d/torwrt', 'files/usr/bin/torwrt'\\); foreach \\($f in $files\\) { $crlf = \\(Get-Content -Raw $f\\) -match \"`r\"; \"{0}: CRLF={1}\" -f $f, $crlf })"
+    ]
+  }
+}

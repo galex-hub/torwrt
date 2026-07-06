@@ -1,0 +1,23 @@
+#!/bin/sh
+# rpcd plugin -> ubus object "luci.torwrt" (file name = object name).
+# Protocol: .ai/luci.md. Thin dispatcher over /usr/lib/torwrt/common.sh;
+# method contract is mirrored in usr/share/rpcd/acl.d/luci-app-torwrt.json.
+
+. /usr/lib/torwrt/common.sh
+
+case "${1:-}" in
+	list)
+		echo '{ "status": {}, "logs": {}, "start": {}, "stop": {}, "restart": {}, "check": {} }'
+	;;
+	call)
+		case "${2:-}" in
+			status)  twrt_status_json ;;
+			logs)    twrt_logs_json ;;
+			start)   twrt_tor_ctl start;   twrt_status_json ;;
+			stop)    twrt_tor_ctl stop;    twrt_status_json ;;
+			restart) twrt_tor_ctl restart; twrt_status_json ;;
+			check)   twrt_check_json ;;
+			*)       echo '{ "error": "unknown method" }' ;;
+		esac
+	;;
+esac

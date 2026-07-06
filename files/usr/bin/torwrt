@@ -1,0 +1,33 @@
+#!/bin/sh
+# torwrt CLI — thin client over the shared lib (same backend the web UI uses).
+# No `set -e`: lib functions use return codes as data.
+set -u
+
+. /usr/lib/torwrt/common.sh
+
+usage() {
+	cat <<EOF
+Usage: torwrt <command>
+
+  status    tor state as JSON (same data as the web UI)
+  logs      recent tor log lines
+  start     start the tor daemon
+  stop      stop the tor daemon
+  restart   restart the tor daemon
+  check     test connectivity through tor (web request), JSON result
+  version   torwrt version
+EOF
+	exit 1
+}
+
+case "${1:-}" in
+	status)  twrt_status_json ;;
+	logs)    twrt_logs_text ;;
+	start|stop|restart)
+		twrt_tor_ctl "$1" || { echo "torwrt: $1 failed — is tor installed?" >&2; exit 1; }
+		echo "ok"
+	;;
+	check)   twrt_check_json ;;
+	version) twrt_version ;;
+	*)       usage ;;
+esac

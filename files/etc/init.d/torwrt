@@ -1,0 +1,12 @@
+#!/bin/sh /etc/rc.common
+# torwrt service — deliberately a no-op in the MVP: the tor daemon's lifecycle
+# is driven through the stock /etc/init.d/tor (via web UI / CLI / ubus).
+# This unit is reserved for future torwrt background needs, e.g. firewall
+# wiring for transparent proxying. See .ai/architecture.md.
+
+USE_PROCD=1
+START=95
+
+start_service() {
+	:
+}
