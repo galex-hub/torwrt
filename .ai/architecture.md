@@ -64,7 +64,8 @@ Implementation notes:
 ## Components
 - **install.sh** — self-contained (runs before anything is installed). Flow:
   root/OpenWrt/version/clock checks → branch tarball into /tmp (tmpfs) →
-  `apk update && apk add` missing deps (tor, curl) → copy `files/` tree to `/`
+  deps (tor, curl): skipped entirely when binaries already present, otherwise
+  `apk update && apk add` under a PATH-interposed `wget -4` wrapper → copy `files/` tree to `/`
   (existing /etc/config/torwrt preserved) → chmod executables → ensure tor
   enabled+running → enable torwrt, restart rpcd, clear LuCI caches.
   Env overrides: `TORWRT_BRANCH`, `TORWRT_FORCE=1` (skip version gate).

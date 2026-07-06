@@ -6,6 +6,10 @@ Baseline: OpenWrt 25.12 (kernel 6.12). Everything below assumes this baseline.
 - 25.12 replaced opkg with apk (Alpine Package Keeper). `opkg` does not exist on target.
 - Commands: `apk update`, `apk add <pkg>`, `apk del <pkg>`, `apk info -e <pkg>` (is installed?).
 - Package names mostly match old opkg names.
+- apk downloads by spawning `wget` found via PATH and has **no IPv4-only switch**;
+  to control its network behavior, interpose a PATH wrapper (install.sh does this
+  to enforce the project IPv4 rule — confirmed live: without it, apk's wget failed
+  with "exited with error 4" on a router while our `-4` fetches worked).
 
 ## Shell: busybox ash
 - POSIX sh only. Forbidden: arrays, `[[ ]]`, `function` keyword, `$'...'`,

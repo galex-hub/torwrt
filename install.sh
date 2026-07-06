@@ -64,10 +64,29 @@ fetch_source() {
 }
 
 install_deps() {
-	log "installing packages: $DEPS"
-	apk update >/dev/null || die "apk update failed"
+	local missing pkg real_wget
+	missing=""
+	# deps are checked by binary name (every current dep ships a same-named binary)
 	# shellcheck disable=SC2086 -- DEPS is a word list
-	apk add $DEPS >/dev/null || die "apk add failed"
+	for pkg in $DEPS; do
+		command -v "$pkg" >/dev/null 2>&1 || missing="$missing $pkg"
+	done
+	if [ -z "$missing" ]; then
+		log "dependencies already installed: $DEPS"
+		return 0
+	fi
+	log "installing packages:$missing"
+	# apk fetches by spawning `wget` from PATH and has no IPv4 switch;
+	# interpose a tmpfs wrapper so apk downloads follow the IPv4-only rule too
+	real_wget=$(command -v wget) || die "wget not found"
+	mkdir -p "$WORKDIR/bin"
+	printf '#!/bin/sh\nexec %s -4 "$@"\n' "$real_wget" > "$WORKDIR/bin/wget"
+	chmod 755 "$WORKDIR/bin/wget"
+	PATH="$WORKDIR/bin:$PATH" apk update >/dev/null ||
+		die "apk update failed — test from the router: wget -4 -O /dev/null https://downloads.openwrt.org/"
+	# shellcheck disable=SC2086 -- missing is a word list
+	PATH="$WORKDIR/bin:$PATH" apk add $missing >/dev/null ||
+		die "apk add failed (see errors above)"
 }
 
 install_files() {

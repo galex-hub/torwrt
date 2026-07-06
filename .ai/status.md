@@ -16,6 +16,11 @@ router (install + UI). Nothing committed/pushed yet — owner triggers commits e
   connectivity check), RU user README. VERSION 0.2.0. First commit pushed.
 - 2026-07-07 — all downloads forced to IPv4 (`wget -4` / `curl -4`, incl. README
   command); recorded as a hard project rule. VERSION 0.2.1.
+- 2026-07-07 — first live test (rockchip/aarch64): tarball fetch OK, but `apk update`
+  failed — apk spawns its own wget without `-4`. Fix: deps skipped when binaries
+  already present + apk runs under a PATH-interposed `wget -4` wrapper. VERSION 0.2.2.
+  Retest pending; if apk still fails with `-4`, downloads.openwrt.org is unreachable
+  from that network → mirror support would be the next move.
 
 ## Verify on the router (first live test)
 1. Install command from README on OpenWrt >= 25.12.4.
