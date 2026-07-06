@@ -13,7 +13,9 @@ router (install + UI). Nothing committed/pushed yet — owner triggers commits e
   config-preserving update, LuCI cache handling); remote galex-hub/torwrt added.
 - 2026-07-07 — working MVP: lib `common.sh` (status/logs/ctl/check via stock
   /etc/init.d/tor), rpcd plugin, CLI, LuCI overview page (poll 5s, action buttons,
-  connectivity check), RU user README. VERSION 0.2.0.
+  connectivity check), RU user README. VERSION 0.2.0. First commit pushed.
+- 2026-07-07 — all downloads forced to IPv4 (`wget -4` / `curl -4`, incl. README
+  command); recorded as a hard project rule. VERSION 0.2.1.
 
 ## Verify on the router (first live test)
 1. Install command from README on OpenWrt >= 25.12.4.

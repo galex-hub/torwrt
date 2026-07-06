@@ -18,7 +18,7 @@ LuCI (**Services → Torwrt**) — статус демона, логи, кноп
 Зайдите на роутер по SSH и выполните:
 
 ```sh
-wget -O /tmp/torwrt-install.sh https://raw.githubusercontent.com/galex-hub/torwrt/main/install.sh
+wget -4 -O /tmp/torwrt-install.sh https://raw.githubusercontent.com/galex-hub/torwrt/main/install.sh
 sh /tmp/torwrt-install.sh
 ```
 

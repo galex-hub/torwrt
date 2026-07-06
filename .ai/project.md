@@ -23,7 +23,7 @@ Future (the skeleton must take these without rewriting the base — see
 ## Delivery model
 - Repo: `git@github.com:galex-hub/torwrt.git` (https://github.com/galex-hub/torwrt).
 - Not shipped as an apk/ipk package. User runs on the router:
-  `wget -O /tmp/torwrt-install.sh https://raw.githubusercontent.com/galex-hub/torwrt/main/install.sh && sh /tmp/torwrt-install.sh`
+  `wget -4 -O /tmp/torwrt-install.sh https://raw.githubusercontent.com/galex-hub/torwrt/main/install.sh && sh /tmp/torwrt-install.sh`
 - `install.sh` bootstraps everything and installs all missing deps (tor, curl, ...);
   exact flow: [architecture.md](architecture.md) → Components.
 - Update = re-run installer (idempotent; user config preserved).
@@ -42,3 +42,4 @@ Future (the skeleton must take these without rewriting the base — see
 | 2026-07-07 | tor lifecycle via stock `/etc/init.d/tor`, no own supervisor | package init already handles procd/user/torrc; no conflicts, no duplication |
 | 2026-07-07 | Classic shell rpcd plugin (not ucode) | plugin sources the shared shell lib directly — single source of logic |
 | 2026-07-07 | User README in Russian | primary audience; commands are copy-paste anyway |
+| 2026-07-07 | **All downloads are IPv4-only** (`wget -4`, `curl -4`) — hard rule for any future network call | half-configured IPv6 on routers stalls/breaks fetches; IPv4 is the dependable path |

@@ -27,7 +27,9 @@ Baseline: OpenWrt 25.12 (kernel 6.12). Everything below assumes this baseline.
   or includes; direct nft only if uci can't express it.
 
 ## Gotchas
-- Download: busybox `wget` (uclient-fetch); HTTPS works on default images.
+- Download: `wget` on default images is uclient-fetch; HTTPS works out of the box.
+  It supports `-4`/`-6`; the busybox wget applet does NOT support `-4` — torwrt
+  relies on uclient-fetch (present in default images). Project rule: always `-4`.
 - No RTC: clock is wrong early at boot until NTP syncs -> TLS downloads can fail.
   Installer/updater must not assume correct time right after boot.
 - Logs: write `logger -t torwrt "msg"`, read `logread -e torwrt`. No persistent logs by default.

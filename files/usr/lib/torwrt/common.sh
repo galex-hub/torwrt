@@ -115,7 +115,8 @@ twrt_check_json() {
 	port=$(twrt_uci_get socks_port "9050")
 	url=$(twrt_uci_get check_url "https://check.torproject.org/api/ip")
 	t0=$(date +%s)
-	resp=$(curl -s -m 12 --socks5-hostname "$addr:$port" "$url" 2>/dev/null)
+	# -4: IPv4 only, project-wide rule for all downloads (see .ai/project.md)
+	resp=$(curl -4 -s -m 12 --socks5-hostname "$addr:$port" "$url" 2>/dev/null)
 	rc=$?
 	t1=$(date +%s)
 	if [ "$rc" -ne 0 ]; then

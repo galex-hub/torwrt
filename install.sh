@@ -1,7 +1,7 @@
 #!/bin/sh
 # torwrt installer for OpenWrt >= 25.12.4.
 # Usage on the router:
-#   wget -O /tmp/torwrt-install.sh https://raw.githubusercontent.com/galex-hub/torwrt/main/install.sh
+#   wget -4 -O /tmp/torwrt-install.sh https://raw.githubusercontent.com/galex-hub/torwrt/main/install.sh
 #   sh /tmp/torwrt-install.sh
 # Re-running updates an existing install; user config is preserved.
 # Env overrides: TORWRT_BRANCH=<branch>   TORWRT_FORCE=1 (skip version gate)
@@ -55,7 +55,8 @@ fetch_source() {
 	log "downloading ${TARBALL_URL}"
 	mkdir -p "$WORKDIR"
 	# tarball is extracted in /tmp (tmpfs): repo docs/tests never touch flash
-	wget -q -O - -T 30 "$TARBALL_URL" | tar -xzf - -C "$WORKDIR" ||
+	# -4: IPv4 only — half-configured IPv6 on routers stalls downloads
+	wget -4 -q -O - -T 30 "$TARBALL_URL" | tar -xzf - -C "$WORKDIR" ||
 		die "download or extract failed (check internet access and DNS)"
 	set -- "$WORKDIR/${REPO_NAME}-"*
 	SRC_DIR="$1"

@@ -56,8 +56,9 @@ Mirrored in the ACL file — change both together. All methods take no args.
 Implementation notes:
 - running = `pidof tor`; enabled = `/etc/init.d/tor enabled`; bootstrap = last
   "Bootstrapped N%" line in `logread` (approximation: -1 when rotated out of the buffer).
-- check = `curl --socks5-hostname` (DNS resolves through tor too), 12 s cap — safely
-  under rpcd/LuCI rpc timeouts; curl exit codes mapped to human messages.
+- check = `curl -4 --socks5-hostname` (DNS resolves through tor too; IPv4-only per
+  project rule), 12 s cap — safely under rpcd/LuCI rpc timeouts; curl exit codes
+  mapped to human messages.
 - tor version cached in /tmp/torwrt.torver (status is polled every 5 s by the UI).
 
 ## Components
