@@ -50,6 +50,11 @@ Baseline: OpenWrt 25.12 (kernel 6.12). Everything below assumes this baseline.
 - Download: `wget` on default images is uclient-fetch; HTTPS works out of the box.
   It supports `-4`/`-6`; the busybox wget applet does NOT support `-4` — torwrt
   relies on uclient-fetch (present in default images). Project rule: always `-4`.
+- `curl` (used for the connectivity check + bridge fetch) needs two things this router
+  can't be assumed to have: **`-4`** (IPv6 is broken here — always pass it on direct
+  fetches, like wget) and **`ca-bundle`** for TLS verification (installer adds it when
+  /etc/ssl/certs/ca-certificates.crt is missing). A curl fetch that returns nothing is
+  almost always one of these — surface `curl`'s exit code, don't just say "unreachable".
 - No RTC: clock is wrong early at boot until NTP syncs -> TLS downloads can fail.
   Installer/updater must not assume correct time right after boot.
 - Logs: write `logger -t torwrt "msg"`, read `logread -e torwrt`. No persistent logs by default.

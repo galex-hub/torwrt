@@ -182,20 +182,44 @@ twrt_set_config() {
 	twrt_bridges_apply
 }
 
+# curl exit code -> human message for a direct HTTPS fetch
+twrt_fetch_error() {
+	case "$1" in
+		5|6) echo "DNS lookup for bridges.torproject.org failed" ;;
+		7)   echo "cannot connect to bridges.torproject.org" ;;
+		28)  echo "connection timed out" ;;
+		22)  echo "server returned an HTTP error (>=400)" ;;
+		35|53|54|58|59|60|66|77|80|82|83|90|91)
+		     echo "TLS/certificate error — install CA certs: apk add ca-bundle" ;;
+		*)   echo "request failed (curl exit $1)" ;;
+	esac
+}
+
 # twrt_get_bridges_json <proxy string|""> <transport>
 # fetches Tor's built-in bridges from the moat circumvention API
 twrt_get_bridges_json() {
-	local proxy="$1" transport="${2:-obfs4}" proxyarg="" resp ty ids k line out=""
+	local proxy="$1" transport="${2:-obfs4}" proxyarg="" v4="-4" resp rc err ty ids k line out=""
 	if [ -n "$proxy" ]; then
 		proxyarg="-x $(twrt_norm_proxy "$proxy")"
+		v4=""   # via a proxy the address family is the proxy's concern
 	fi
-	# shellcheck disable=SC2086 -- proxyarg is an optional "-x <url>" pair
-	resp=$(curl -fsS -m 30 $proxyarg -H 'Content-Type: application/vnd.api+json' \
+	# -4 by default: this router's IPv6 is unreliable (project rule), and the
+	# connectivity check already forces it — the direct bridge fetch must too.
+	# shellcheck disable=SC2086 -- v4/proxyarg are optional flag words
+	resp=$(curl $v4 -fsS -m 30 $proxyarg -H 'Content-Type: application/vnd.api+json' \
 		-d '{}' "$TORWRT_MOAT_BUILTIN" 2>/dev/null)
-	if [ -z "$resp" ]; then
+	rc=$?
+	err=""
+	if [ "$rc" -ne 0 ]; then
+		err="$(twrt_fetch_error "$rc")${proxy:+ (via the proxy)}"
+	elif [ -z "$resp" ]; then
+		err="empty response from bridges.torproject.org"
+	fi
+	if [ -n "$err" ]; then
 		json_init
 		json_add_boolean "ok" 0
-		json_add_string "error" "request failed — bridges.torproject.org unreachable${proxy:+ (through the proxy)}"
+		json_add_string "error" "$err"
+		json_add_int "curl_rc" "$rc"
 		json_dump
 		return 0
 	fi

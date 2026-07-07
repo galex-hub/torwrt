@@ -132,6 +132,8 @@ collect_missing_deps() {
 	for pkg in $DEPS; do
 		command -v "$pkg" >/dev/null 2>&1 || DEPS_MISSING="$DEPS_MISSING $pkg"
 	done
+	# ca-bundle ships no binary — check the cert file; curl needs it for TLS
+	[ -f /etc/ssl/certs/ca-certificates.crt ] || DEPS_MISSING="$DEPS_MISSING ca-bundle"
 }
 
 # one direct tarball fetch into tmpfs; $1 = wget flags ("-4" or "")

@@ -19,6 +19,13 @@ Installer + Status tab confirmed working on a live router (rockchip/aarch64, 25.
   (3) In-app bridge fetch from moat `circumvention/builtin` (obfs4/snowflake/meek-azure),
   optional SOCKS5. (4) Info block: website CAPTCHA, email, telegram. obfs4proxy is a dep.
 
+## Recent fixes
+- 0.4.1 — bridges.js had a stray `)` → view failed to parse (blank tab). Added
+  scripts/jsbal.py to catch that class before commit.
+- 0.4.2 — "Get bridges" failed with "unreachable" on the live router: the bridge-fetch
+  curl lacked `-4` (this router's IPv6 is broken; check() had `-4`, get_bridges didn't).
+  Added `-4`, real curl-exit-code error messages, and `ca-bundle` as a conditional dep.
+
 ## Verify on the router (this release)
 1. `torwrt uninstall` then reinstall to get obfs4proxy + new files (or just re-run installer).
 2. Proxy install: `sh install.sh --proxy socks5://HOST:PORT` on a box without tor/curl —
