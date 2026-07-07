@@ -198,7 +198,7 @@ return view.extend({
 						'@GetBridgesBot'),
 					' ', _('and send '),
 					E('code', {}, '/bridges'),
-					' ', _('(or '), E('code', {}, '/obfs4'), _(' / '), E('code', {}, '/webtunnel'), ').')
+					' ', _('(or /obfs4 / /webtunnel).')
 				])
 			])
 		]);

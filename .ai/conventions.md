@@ -15,6 +15,9 @@
 ## LuCI JS / JSON
 - JS: LuCI idioms only (see [luci.md](luci.md)); `'use strict';` first line; tabs.
 - menu.d / acl.d: strict JSON (no comments, no trailing commas), tabs.
+- No JS runtime on the dev box: before committing a `.js` view, run the bracket
+  checker `scripts/jsbal.py <file>` (string/comment/regex-aware) to catch paren/
+  bracket imbalances — the exact class of bug that breaks a LuCI page at parse time.
 
 ## Files
 - **LF line endings only** (enforced via .gitattributes). CRLF silently breaks ash
