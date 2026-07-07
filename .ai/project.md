@@ -5,16 +5,20 @@ supervises the daemon, configures the connection to it and (later) traffic throu
 Ships with a LuCI web UI under **Services → Torwrt**.
 
 ## Scope
-MVP (current target):
-- Self-install via one command (`install.sh`): installs tor, torwrt itself, the LuCI app.
-- LuCI page **Services → Torwrt**: connection status, log block,
-  start / stop / restart buttons, "check connection" (web request through tor).
-- No traffic proxying yet — this is the base.
+Done:
+- Self-install via one command (`install.sh`): installs tor, curl, obfs4proxy, torwrt,
+  the LuCI app. Optional `--proxy` routes the whole install through a SOCKS5 proxy.
+- LuCI **Services → Torwrt**, tab **Status**: daemon status, logs, start/stop/restart,
+  "check connection" (web request through tor).
+- LuCI tab **Bridges**: paste/enable a bridge list (applied to tor), fetch built-in
+  bridges in-app from bridges.torproject.org (optional SOCKS5 proxy), and info on the
+  website/email/telegram bridge channels.
 
 Future (the skeleton must take these without rewriting the base — see
 [architecture.md](architecture.md) design principles):
 - Transparent proxying of selected traffic through tor.
-- Configuring the tor connection from the UI (ports, bridges / pluggable transports).
+- More tor connection settings from the UI (ports, snowflake/webtunnel transports,
+  per-country bridge recommendations via the moat settings API, CAPTCHA bridge flow).
 
 ## Targets
 - OpenWrt **>= 25.12.4** only. No older releases (installer must check and refuse).
@@ -44,3 +48,8 @@ Future (the skeleton must take these without rewriting the base — see
 | 2026-07-07 | **All user-facing text is English** (README, UI, installer/CLI output) | owner's call after live test: no RU/EN mixing |
 | 2026-07-07 | Downloads prefer IPv4 (`-4`) with automatic fallback to system default | broken IPv6 stalls fetches, but IPv4-only must not brick installs where it is unavailable; installer probes and picks |
 | 2026-07-07 | Installer changes nothing until connectivity to every required resource is confirmed | no half-installed state, ever |
+| 2026-07-07 | `--proxy` install routes everything through curl+SOCKS5 (uclient-fetch can't do SOCKS); requires curl present | reach GitHub/feeds from censored networks; verified before any change |
+| 2026-07-07 | Bundle `obfs4proxy` as a base dep | bridges are a core feature; obfs4 must work out of the box |
+| 2026-07-07 | tor config via package `tail_include`, managed file `/etc/tor/torwrt.conf` | package-blessed, isolated, uninstall-clean; never touch stock torrc |
+| 2026-07-07 | Bridges stored base64 in `torwrt.main.bridges_b64` | multi-line/whitespace-safe in UCI; survives updates; removed on uninstall |
+| 2026-07-07 | In-app "get bridges" = moat `circumvention/builtin` (no CAPTCHA), not the /bridges/ CAPTCHA page | reliable in an embedded UI; CAPTCHA/email/telegram offered as info links for unique bridges |

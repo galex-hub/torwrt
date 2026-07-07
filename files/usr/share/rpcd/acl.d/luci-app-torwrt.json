@@ -3,12 +3,12 @@
 		"description": "Grant access to the torwrt UI backend",
 		"read": {
 			"ubus": {
-				"luci.torwrt": [ "status", "logs" ]
+				"luci.torwrt": [ "status", "logs", "get_config" ]
 			}
 		},
 		"write": {
 			"ubus": {
-				"luci.torwrt": [ "start", "stop", "restart", "check" ]
+				"luci.torwrt": [ "start", "stop", "restart", "check", "set_config", "get_bridges" ]
 			}
 		}
 	}

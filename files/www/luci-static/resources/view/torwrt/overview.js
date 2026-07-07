@@ -66,6 +66,7 @@ return view.extend({
 			statusRow(_('Tor daemon'), stateCell),
 			statusRow(_('Bootstrap'), bootstrap),
 			statusRow(_('Autostart'), st.enabled ? _('enabled') : _('disabled')),
+			statusRow(_('Bridges'), st.bridges_enabled ? _('enabled') : _('disabled')),
 			statusRow(_('Tor version'), st.tor_version || '—'),
 			statusRow(_('Torwrt version'), st.torwrt_version || '—')
 		]);

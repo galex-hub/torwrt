@@ -7,10 +7,25 @@ Baseline: OpenWrt 25.12 (kernel 6.12). Everything below assumes this baseline.
 - Commands: `apk update`, `apk add <pkg>`, `apk del <pkg>`, `apk info -e <pkg>` (is installed?).
 - Package names mostly match old opkg names.
 - apk downloads by spawning `wget` (its errors reference wget) and has **no IPv4-only
-  switch**. install.sh interposes a PATH wget wrapper with the chosen net flags, but a
-  live test still saw one failure with the wrapper active that passed on a later run —
-  feed connectivity can simply be flaky. Hence: preflight the feed URL and retry apk
-  (installer does both); do not assume the wrapper alone fixes feed errors.
+  and no SOCKS switch**. install.sh interposes a PATH wget wrapper: direct mode adds
+  the net flags; proxy mode replaces wget with a curl+socks shim (uclient-fetch cannot
+  do SOCKS5 — verified; redsocks/curl are the only options). Feed connectivity can be
+  flaky (a live test failed once with the wrapper then passed) → preflight the feed URL
+  and retry apk; do not assume the wrapper alone fixes feed errors.
+
+## tor package (net/tor)
+- `apk add tor` installs the **full** variant (bridges/relay). `tor-basic` has **no
+  bridge support** — do not depend on it. Binary: `/usr/sbin/tor`; runs as user `tor`.
+- Init `/etc/init.d/tor` generates `/tmp/torrc` from UCI `/etc/config/tor` (section
+  `tor.conf`) and starts `tor -f /tmp/torrc`. Default torrc = `/etc/tor/torrc`; it sets
+  `Log notice syslog` (so our syslog-based status/logs/bootstrap parsing works).
+- **Add config the blessed way**: `uci add_list tor.conf.tail_include='/path.conf'`,
+  `uci commit tor`, restart tor → init appends `%include /path.conf`. Never edit the
+  stock torrc. torwrt uses this with `/etc/tor/torwrt.conf`.
+- obfs4: OpenWrt package `obfs4proxy` → `/usr/bin/obfs4proxy` (provides obfs4).
+  snowflake/meek/webtunnel need other binaries (not packaged the same way).
+- Bridge config: `UseBridges 1` + `ClientTransportPlugin obfs4 exec /usr/bin/obfs4proxy`
+  + `Bridge <line>` per bridge.
 
 ## Shell: busybox ash
 - POSIX sh only. Forbidden: arrays, `[[ ]]`, `function` keyword, `$'...'`,

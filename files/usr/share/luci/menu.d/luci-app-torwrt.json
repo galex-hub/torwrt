@@ -3,11 +3,26 @@
 		"title": "Torwrt",
 		"order": 90,
 		"action": {
-			"type": "view",
-			"path": "torwrt/overview"
+			"type": "firstchild"
 		},
 		"depends": {
 			"acl": [ "luci-app-torwrt" ]
+		}
+	},
+	"admin/services/torwrt/overview": {
+		"title": "Status",
+		"order": 10,
+		"action": {
+			"type": "view",
+			"path": "torwrt/overview"
+		}
+	},
+	"admin/services/torwrt/bridges": {
+		"title": "Bridges",
+		"order": 20,
+		"action": {
+			"type": "view",
+			"path": "torwrt/bridges"
 		}
 	}
 }

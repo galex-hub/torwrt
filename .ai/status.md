@@ -2,42 +2,39 @@
 Updated: 2026-07-07
 
 ## State
-**MVP installed successfully on a live router** (rockchip/aarch64, 25.12.4) after the
-network fixes below. UI functionality feedback pending from the owner.
+Installer + Status tab confirmed working on a live router (rockchip/aarch64, 25.12.4).
+**New, NOT yet hardware-tested:** SOCKS5 proxy install (`--proxy`), the Bridges tab
+(list/apply, in-app fetch, info), tor bridge integration via `tail_include`, and
+`obfs4proxy` as a base dep. Nothing committed/pushed yet — owner triggers commits.
 
 ## Done
-- 2026-07-06 — project structure, `.ai/` docs, stub files, git init.
-- 2026-07-07 — scope confirmed; LuCI skeleton; ubus contract; doc rules relaxed.
-- 2026-07-07 — install.sh implemented (version gate, tmpfs tarball, apk deps,
-  config-preserving update, LuCI cache handling); remote galex-hub/torwrt added.
-- 2026-07-07 — working MVP: lib `common.sh` (status/logs/ctl/check via stock
-  /etc/init.d/tor), rpcd plugin, CLI, LuCI overview page (poll 5s, action buttons,
-  connectivity check), RU user README. VERSION 0.2.0. First commit pushed.
-- 2026-07-07 — all downloads forced to IPv4 (`wget -4` / `curl -4`, incl. README
-  command); recorded as a hard project rule. VERSION 0.2.1.
-- 2026-07-07 — first live test (rockchip/aarch64): tarball fetch OK, but `apk update`
-  failed — apk spawns its own wget without `-4`. Fix: deps skipped when binaries
-  already present + apk runs under a PATH-interposed `wget -4` wrapper. VERSION 0.2.2.
-- 2026-07-07 — second live test: apk failed once more even with the wrapper (manual
-  `wget -4` to the feed worked), then **install succeeded** — feed connectivity is
-  flaky. Installer hardened: connectivity preflight for every required resource
-  before touching the system (clean abort otherwise), IPv4 preferred with automatic
-  fallback to system default, apk retries, green SUCCESS summary with
-  installed-vs-updated versions. Added `torwrt uninstall` (clean removal, tor/curl
-  left untouched). All user-facing text switched to English (README rewritten).
-  VERSION 0.3.0.
+- 2026-07-06 — structure, `.ai/` docs, stubs, git init.
+- 2026-07-07 — MVP: install.sh, backend lib, rpcd plugin, CLI, Status page. Live-install
+  fixes: IPv4 (+fallback), feed preflight, apk retries, green summary, `uninstall`.
+  English-only user text. Pushed through VERSION 0.3.0.
+- 2026-07-07 — VERSION 0.4.0: (1) `--proxy`/`TORWRT_PROXY` — whole install through a
+  SOCKS5 proxy (curl shim for apk; verified before any change; needs curl present).
+  (2) Bridges tab + backend: get_config/set_config/get_bridges, bridges stored b64 in
+  UCI, applied to tor via `/etc/tor/torwrt.conf` + `tor.conf.tail_include`.
+  (3) In-app bridge fetch from moat `circumvention/builtin` (obfs4/snowflake/meek-azure),
+  optional SOCKS5. (4) Info block: website CAPTCHA, email, telegram. obfs4proxy is a dep.
 
-## Verify on the router (remaining)
-1. LuCI page under Services: status/bootstrap correct, logs shown, buttons + check work
-   (tor must log to syslog as ` Tor[pid]:` for bootstrap parsing — if the tag differs,
-   fix the grep in `twrt_logs_text`/`twrt_bootstrap_read`).
-2. Re-run installer: reports "updated OLD -> NEW", config preserved, green summary.
-3. `torwrt uninstall`: menu entry gone, files gone, tor still running; reinstall works.
+## Verify on the router (this release)
+1. `torwrt uninstall` then reinstall to get obfs4proxy + new files (or just re-run installer).
+2. Proxy install: `sh install.sh --proxy socks5://HOST:PORT` on a box without tor/curl —
+   proxy verified first; apk pulls through it; clean abort if the proxy is dead.
+3. Bridges tab: paste an obfs4 bridge, enable, Save & apply → `logread -e Tor` shows it
+   using the bridge; Status tab shows Bridges = enabled. Confirm `/tmp/torrc` has the
+   `%include /etc/tor/torwrt.conf` line and `uci show tor.conf` has the tail_include.
+4. "Get bridges" (obfs4) with and without a SOCKS5 proxy → lines appear, "Add" fills the
+   textarea. (Endpoint shape verified from a dev box; the jshn parse is untested on ash.)
+5. Uninstall removes the tail_include + /etc/tor/torwrt.conf and restarts tor cleanly.
 
 ## Next steps
-1. Commit + push (owner's call), owner tests on router, fix findings.
-2. Traffic proxying design (transparent proxy via fw4/nftables, per-device/all-LAN policy).
-3. Tor connection config from UI (ports; bridges/pluggable transports).
+1. Commit + push (owner's call); fix hardware-test findings.
+2. Traffic proxying design (transparent proxy via fw4/nftables).
+3. More bridge options: snowflake/webtunnel transports, moat settings (per-country),
+   optional CAPTCHA flow for unique bridges.
 4. Release flow: tags, pin installer to a release instead of main.
 
 ## Open questions

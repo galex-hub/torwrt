@@ -15,6 +15,7 @@ Usage: torwrt <command>
   stop       stop the tor daemon
   restart    restart the tor daemon
   check      test connectivity through tor (web request), JSON result
+  bridges    get Tor built-in bridges as JSON (optional: <transport> <proxy>)
   version    torwrt version
   uninstall  cleanly remove torwrt (tor itself is left untouched)
 EOF
@@ -29,6 +30,7 @@ case "${1:-}" in
 		echo "ok"
 	;;
 	check)   twrt_check_json ;;
+	bridges) twrt_get_bridges_json "${3:-}" "${2:-obfs4}" ;;
 	version) twrt_version ;;
 	uninstall)
 		echo "torwrt: removing torwrt from the system (tor daemon and packages stay untouched)"

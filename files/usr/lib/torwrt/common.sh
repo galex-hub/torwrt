@@ -7,6 +7,9 @@
 TORWRT_VERSION_FILE="/usr/lib/torwrt/VERSION"
 TORWRT_TOR_INIT="/etc/init.d/tor"
 TORWRT_TORVER_CACHE="/tmp/torwrt.torver"
+TORWRT_TOR_CONF="/etc/tor/torwrt.conf"        # our managed tor config fragment
+TORWRT_OBFS4="/usr/bin/obfs4proxy"
+TORWRT_MOAT_BUILTIN="https://bridges.torproject.org/moat/circumvention/builtin"
 
 twrt_version() {
 	cat "$TORWRT_VERSION_FILE" 2>/dev/null || echo "unknown"
@@ -17,6 +20,14 @@ twrt_uci_get() {
 	local v
 	v=$(uci -q get "torwrt.main.$1" || :)
 	[ -n "$v" ] && echo "$v" || echo "$2"
+}
+
+# any proxy string -> curl form socks5h://[user:pass@]host:port (h = resolve via proxy)
+twrt_norm_proxy() {
+	local p="$1"
+	[ -n "$p" ] || return 1
+	case "$p" in *://*) p=${p#*://} ;; esac
+	printf 'socks5h://%s' "$p"
 }
 
 # prints first tor PID; rc 1 and no output when not running
@@ -88,6 +99,7 @@ twrt_status_json() {
 	json_add_boolean "enabled" "$enabled"
 	json_add_int "bootstrap" "$TWRT_BOOTSTRAP_PCT"
 	json_add_string "bootstrap_msg" "$TWRT_BOOTSTRAP_MSG"
+	json_add_boolean "bridges_enabled" "$(twrt_uci_get bridges_enabled 0)"
 	json_dump
 }
 
@@ -97,6 +109,122 @@ twrt_logs_json() {
 	json_dump
 }
 
+# ---- bridges configuration ---------------------------------------------------
+# Bridge lines are stored base64-encoded in one UCI option so arbitrary
+# whitespace/newlines round-trip safely inside /etc/config/torwrt.
+
+twrt_bridges_text() {
+	local b
+	b=$(twrt_uci_get bridges_b64 "")
+	[ -n "$b" ] || return 0
+	printf '%s' "$b" | base64 -d 2>/dev/null
+}
+
+twrt_get_config_json() {
+	json_init
+	json_add_boolean "bridges_enabled" "$(twrt_uci_get bridges_enabled 0)"
+	json_add_string "bridges" "$(twrt_bridges_text)"
+	json_add_boolean "obfs4_available" "$([ -x "$TORWRT_OBFS4" ] && echo 1 || echo 0)"
+	json_dump
+}
+
+# ensure tor loads our fragment via the package's UCI tail_include mechanism
+twrt_tor_include_ensure() {
+	uci -q get tor.conf.default >/dev/null 2>&1 || return 0   # tor uci not present
+	if ! uci -q get tor.conf.tail_include 2>/dev/null | tr ' ' '\n' | grep -qxF "$TORWRT_TOR_CONF"; then
+		uci add_list tor.conf.tail_include="$TORWRT_TOR_CONF"
+		uci commit tor
+	fi
+}
+
+twrt_tor_include_remove() {
+	uci -q get tor.conf.default >/dev/null 2>&1 || return 0
+	uci -q del_list tor.conf.tail_include="$TORWRT_TOR_CONF" 2>/dev/null
+	uci commit tor 2>/dev/null
+}
+
+# write the managed fragment from stored config and restart tor
+twrt_bridges_apply() {
+	local enabled text
+	enabled=$(twrt_uci_get bridges_enabled 0)
+	text=$(twrt_bridges_text)
+	mkdir -p /etc/tor
+	if [ "$enabled" = "1" ] && [ -n "$text" ]; then
+		{
+			echo "# Managed by torwrt — edit via LuCI: Services -> Torwrt -> Bridges."
+			echo "UseBridges 1"
+			if [ -x "$TORWRT_OBFS4" ] && echo "$text" | grep -qiE '^(bridge[[:space:]]+)?obfs4[[:space:]]'; then
+				echo "ClientTransportPlugin obfs4 exec $TORWRT_OBFS4"
+			fi
+			echo "$text" | while IFS= read -r line; do
+				line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+				case "$line" in ""|\#*) continue ;; esac
+				line=${line#Bridge }; line=${line#bridge }
+				echo "Bridge $line"
+			done
+		} > "$TORWRT_TOR_CONF"
+	else
+		echo "# Managed by torwrt — bridges disabled." > "$TORWRT_TOR_CONF"
+	fi
+	chmod 644 "$TORWRT_TOR_CONF"
+	twrt_tor_include_ensure
+	twrt_tor_ctl restart
+}
+
+# twrt_set_config <enabled 0|1> <bridges text>
+twrt_set_config() {
+	local en="$1" text="$2" enc
+	[ "$en" = "1" ] || en="0"
+	enc=$(printf '%s' "$text" | base64 2>/dev/null | tr -d '\n')
+	uci set torwrt.main.bridges_enabled="$en"
+	uci set torwrt.main.bridges_b64="$enc"
+	uci commit torwrt
+	twrt_bridges_apply
+}
+
+# twrt_get_bridges_json <proxy string|""> <transport>
+# fetches Tor's built-in bridges from the moat circumvention API
+twrt_get_bridges_json() {
+	local proxy="$1" transport="${2:-obfs4}" proxyarg="" resp ty ids k line out=""
+	if [ -n "$proxy" ]; then
+		proxyarg="-x $(twrt_norm_proxy "$proxy")"
+	fi
+	# shellcheck disable=SC2086 -- proxyarg is an optional "-x <url>" pair
+	resp=$(curl -fsS -m 30 $proxyarg -H 'Content-Type: application/vnd.api+json' \
+		-d '{}' "$TORWRT_MOAT_BUILTIN" 2>/dev/null)
+	if [ -z "$resp" ]; then
+		json_init
+		json_add_boolean "ok" 0
+		json_add_string "error" "request failed — bridges.torproject.org unreachable${proxy:+ (through the proxy)}"
+		json_dump
+		return 0
+	fi
+	if json_load "$resp" 2>/dev/null; then
+		json_get_type ty "$transport"
+		if [ "$ty" = "array" ]; then
+			json_select "$transport"
+			json_get_keys ids
+			for k in $ids; do
+				json_get_var line "$k"
+				out="$out$line
+"
+			done
+			json_select ..
+		fi
+	fi
+	json_init
+	if [ -n "$out" ]; then
+		json_add_boolean "ok" 1
+		json_add_string "transport" "$transport"
+		json_add_string "bridges" "$out"
+	else
+		json_add_boolean "ok" 0
+		json_add_string "error" "no '$transport' bridges in the response"
+	fi
+	json_dump
+}
+
+# ---- connectivity check ------------------------------------------------------
 # curl exit code -> human message; args: <rc> <addr> <port>
 twrt_curl_error() {
 	case "$1" in
@@ -106,27 +234,6 @@ twrt_curl_error() {
 		127) echo "curl is not installed" ;;
 		*)   echo "request failed (curl exit code $1)" ;;
 	esac
-}
-
-# clean torwrt removal; the tor daemon and installed packages stay untouched
-twrt_uninstall() {
-	if [ -x /etc/init.d/torwrt ]; then
-		/etc/init.d/torwrt stop >/dev/null 2>&1
-		/etc/init.d/torwrt disable >/dev/null 2>&1
-	fi
-	rm -f /etc/init.d/torwrt \
-		/etc/config/torwrt \
-		/usr/bin/torwrt \
-		/usr/libexec/rpcd/luci.torwrt \
-		/usr/share/luci/menu.d/luci-app-torwrt.json \
-		/usr/share/rpcd/acl.d/luci-app-torwrt.json \
-		"$TORWRT_TORVER_CACHE"
-	rm -rf /usr/lib/torwrt /www/luci-static/resources/view/torwrt
-	/etc/init.d/rpcd restart >/dev/null 2>&1
-	# clear LuCI caches so the menu entry disappears right away
-	rm -f /tmp/luci-indexcache*
-	rm -rf /tmp/luci-modulecache/
-	return 0
 }
 
 # live connectivity test: web request through the tor SOCKS proxy
@@ -164,4 +271,30 @@ twrt_check_json() {
 	fi
 	json_add_int "elapsed_s" $((t1 - t0))
 	json_dump
+}
+
+# ---- uninstall ---------------------------------------------------------------
+# clean torwrt removal; the tor daemon and installed packages stay untouched
+twrt_uninstall() {
+	if [ -x /etc/init.d/torwrt ]; then
+		/etc/init.d/torwrt stop >/dev/null 2>&1
+		/etc/init.d/torwrt disable >/dev/null 2>&1
+	fi
+	# undo tor bridge integration
+	twrt_tor_include_remove
+	rm -f "$TORWRT_TOR_CONF"
+	twrt_tor_ctl restart
+	rm -f /etc/init.d/torwrt \
+		/etc/config/torwrt \
+		/usr/bin/torwrt \
+		/usr/libexec/rpcd/luci.torwrt \
+		/usr/share/luci/menu.d/luci-app-torwrt.json \
+		/usr/share/rpcd/acl.d/luci-app-torwrt.json \
+		"$TORWRT_TORVER_CACHE"
+	rm -rf /usr/lib/torwrt /www/luci-static/resources/view/torwrt
+	/etc/init.d/rpcd restart >/dev/null 2>&1
+	# clear LuCI caches so the menu entry disappears right away
+	rm -f /tmp/luci-indexcache*
+	rm -rf /tmp/luci-modulecache/
+	return 0
 }

@@ -7,9 +7,16 @@
 
 case "${1:-}" in
 	list)
-		echo '{ "status": {}, "logs": {}, "start": {}, "stop": {}, "restart": {}, "check": {} }'
+		echo '{ "status": {}, "logs": {}, "start": {}, "stop": {}, "restart": {}, "check": {}, "get_config": {}, "set_config": { "enabled": true, "bridges": "str" }, "get_bridges": { "proxy": "str", "transport": "str" } }'
 	;;
 	call)
+		# methods that take arguments read a single JSON object from stdin
+		case "${2:-}" in
+			set_config|get_bridges)
+				input=$(cat)
+				json_load "$input" 2>/dev/null || input=""
+			;;
+		esac
 		case "${2:-}" in
 			status)  twrt_status_json ;;
 			logs)    twrt_logs_json ;;
@@ -17,7 +24,21 @@ case "${1:-}" in
 			stop)    twrt_tor_ctl stop;    twrt_status_json ;;
 			restart) twrt_tor_ctl restart; twrt_status_json ;;
 			check)   twrt_check_json ;;
-			*)       echo '{ "error": "unknown method" }' ;;
+			get_config) twrt_get_config_json ;;
+			set_config)
+				enabled=0; bridges=""
+				json_get_var enabled enabled
+				json_get_var bridges bridges
+				twrt_set_config "$enabled" "$bridges"
+				twrt_get_config_json
+			;;
+			get_bridges)
+				proxy=""; transport="obfs4"
+				json_get_var proxy proxy
+				json_get_var transport transport
+				twrt_get_bridges_json "$proxy" "$transport"
+			;;
+			*) echo '{ "error": "unknown method" }' ;;
 		esac
 	;;
 esac

@@ -2,11 +2,15 @@
 # torwrt installer for OpenWrt >= 25.12.4.
 # Usage on the router:
 #   wget -4 -O /tmp/torwrt-install.sh https://raw.githubusercontent.com/galex-hub/torwrt/main/install.sh
-#   sh /tmp/torwrt-install.sh
+#   sh /tmp/torwrt-install.sh [--proxy socks5://[user:pass@]host:port]
 # Re-running updates an existing install; user config is preserved.
 # Nothing is changed on the system until connectivity to every required
 # resource has been confirmed.
-# Env overrides: TORWRT_BRANCH=<branch>   TORWRT_FORCE=1 (skip version gate)
+# Options:
+#   --proxy <url>   route ALL downloads through a SOCKS5 proxy (requires curl).
+#                   Accepts socks5://host:port, host:port, or user:pass@host:port.
+# Env overrides: TORWRT_BRANCH=<branch>  TORWRT_FORCE=1 (skip version gate)
+#                TORWRT_PROXY=<url> (same as --proxy)
 set -eu
 
 REPO_OWNER="galex-hub"
@@ -15,18 +19,46 @@ BRANCH="${TORWRT_BRANCH:-main}"
 TARBALL_URL="https://codeload.github.com/${REPO_OWNER}/${REPO_NAME}/tar.gz/refs/heads/${BRANCH}"
 FEEDS_PROBE_URL="https://downloads.openwrt.org/"
 MIN_VERSION="25.12.4"
-DEPS="tor curl"
+DEPS="tor curl obfs4proxy"
 WORKDIR="/tmp/torwrt-install.$$"
 SRC_DIR=""
 NET_FLAGS="-4"
 DEPS_MISSING=""
 OLD_VERSION=""
+PROXY="${TORWRT_PROXY:-}"
+CURL_PROXY=""
+MODE="direct"
 
 log() { echo "torwrt: $*"; }
 ok()  { printf '\033[1;32mtorwrt: %s\033[0m\n' "$*"; }
 die() { echo "torwrt: ERROR: $*" >&2; exit 1; }
 cleanup() { rm -rf "$WORKDIR"; }
 trap cleanup EXIT
+
+usage() {
+	cat <<EOF
+torwrt installer (OpenWrt >= $MIN_VERSION)
+
+  sh install.sh [--proxy <socks5-url>]
+
+  --proxy <url>   route all downloads through a SOCKS5 proxy (needs curl).
+                  Forms: socks5://host:port | host:port | user:pass@host:port
+  -h, --help      show this help
+
+Env: TORWRT_BRANCH, TORWRT_FORCE=1, TORWRT_PROXY
+EOF
+}
+
+parse_args() {
+	while [ $# -gt 0 ]; do
+		case "$1" in
+			--proxy) [ $# -ge 2 ] || die "--proxy needs a value"; PROXY="$2"; shift 2 ;;
+			--proxy=*) PROXY="${1#*=}"; shift ;;
+			-h|--help) usage; exit 0 ;;
+			*) die "unknown option: $1 (see --help)" ;;
+		esac
+	done
+}
 
 # retry <attempts> <command...>
 retry() {
@@ -39,6 +71,13 @@ retry() {
 		sleep 2
 	done
 	return 0
+}
+
+# any proxy string -> curl form: socks5h://[user:pass@]host:port (h = resolve via proxy)
+normalize_proxy() {
+	p="$1"
+	case "$p" in *://*) p=${p#*://} ;; esac
+	printf 'socks5h://%s' "$p"
 }
 
 # "25.12.4[-suffix]" -> 25012004; non-numeric ("SNAPSHOT", "r12345-...") -> 0
@@ -71,17 +110,31 @@ check_system() {
 	[ -d /www/luci-static ] || log "warning: LuCI not detected — the web UI will not be available"
 }
 
+# decide the download mechanism; verify the proxy before touching anything
+setup_download() {
+	[ -n "$PROXY" ] || return 0
+	command -v curl >/dev/null 2>&1 ||
+		die "installing through a SOCKS5 proxy requires 'curl', which is not installed — install it first (from a direct connection) or run without --proxy"
+	CURL_PROXY=$(normalize_proxy "$PROXY")
+	MODE="proxy"
+	log "routing all downloads through SOCKS5 proxy: $CURL_PROXY"
+	log "verifying proxy reachability..."
+	curl -fsS -x "$CURL_PROXY" -m 20 -o /dev/null "$FEEDS_PROBE_URL" ||
+		die "proxy check failed — cannot reach $FEEDS_PROBE_URL through the proxy (aborted, nothing was installed)"
+	ok "proxy OK"
+}
+
 collect_missing_deps() {
 	local pkg
 	DEPS_MISSING=""
-	# deps are checked by binary name (every current dep ships a same-named binary)
+	# deps are checked by binary name (every dep ships a same-named binary)
 	# shellcheck disable=SC2086 -- DEPS is a word list
 	for pkg in $DEPS; do
 		command -v "$pkg" >/dev/null 2>&1 || DEPS_MISSING="$DEPS_MISSING $pkg"
 	done
 }
 
-# one tarball fetch attempt into tmpfs; $1 = wget flags ("-4" or "")
+# one direct tarball fetch into tmpfs; $1 = wget flags ("-4" or "")
 fetch_tar() {
 	rm -rf "$WORKDIR/src"
 	mkdir -p "$WORKDIR/src"
@@ -89,11 +142,13 @@ fetch_tar() {
 	wget $1 -q -O - -T 20 "$TARBALL_URL" 2>/dev/null | tar -xzf - -C "$WORKDIR/src" 2>/dev/null
 }
 
-# downloads the repo tarball and picks the network mode for everything after:
-# IPv4-only whenever it works (project rule), system default as a fallback
 fetch_source() {
 	log "downloading ${TARBALL_URL}"
-	if fetch_tar "-4"; then
+	if [ "$MODE" = "proxy" ]; then
+		rm -rf "$WORKDIR/src"; mkdir -p "$WORKDIR/src"
+		curl -fsSL -x "$CURL_PROXY" -m 120 "$TARBALL_URL" | tar -xzf - -C "$WORKDIR/src" 2>/dev/null ||
+			die "cannot download the torwrt archive through the proxy — aborted, nothing was installed"
+	elif fetch_tar "-4"; then
 		NET_FLAGS="-4"
 		log "network mode: IPv4-only"
 	elif fetch_tar ""; then
@@ -108,8 +163,12 @@ fetch_source() {
 }
 
 feeds_probe() {
-	# shellcheck disable=SC2086 -- NET_FLAGS is an optional flag word
-	wget $NET_FLAGS -q -O /dev/null -T 15 "$FEEDS_PROBE_URL" 2>/dev/null
+	if [ "$MODE" = "proxy" ]; then
+		curl -fsS -x "$CURL_PROXY" -m 15 -o /dev/null "$FEEDS_PROBE_URL"
+	else
+		# shellcheck disable=SC2086 -- NET_FLAGS is an optional flag word
+		wget $NET_FLAGS -q -O /dev/null -T 15 "$FEEDS_PROBE_URL"
+	fi
 }
 
 preflight_feeds() {
@@ -124,19 +183,48 @@ apk_add_q() {
 	PATH="$WORKDIR/bin:$PATH" apk add $DEPS_MISSING >/dev/null
 }
 
-install_deps() {
+# apk downloads by spawning `wget`; interpose a wrapper so its traffic follows
+# the chosen network mode (IPv4-only, or the SOCKS5 proxy via curl)
+make_wget_wrapper() {
 	local real_wget
+	mkdir -p "$WORKDIR/bin"
+	if [ "$MODE" = "proxy" ]; then
+		# translate wget-style calls (apk uses -O <file>/-O -) into curl+proxy
+		cat > "$WORKDIR/bin/wget" <<EOF
+#!/bin/sh
+url=""; out="-"
+while [ \$# -gt 0 ]; do
+	case "\$1" in
+		-O) out="\$2"; shift 2; continue ;;
+		-O*) out="\${1#-O}"; shift; continue ;;
+		--output-document=*) out="\${1#*=}"; shift; continue ;;
+		-T) shift 2; continue ;;
+		http://*|https://*|ftp://*) url="\$1"; shift; continue ;;
+		-*) shift; continue ;;
+		*) [ -z "\$url" ] && url="\$1"; shift; continue ;;
+	esac
+done
+[ -n "\$url" ] || exit 4
+if [ "\$out" = "-" ]; then
+	exec curl -fsSL --connect-timeout 30 -x "$CURL_PROXY" "\$url"
+else
+	exec curl -fsSL --connect-timeout 30 -x "$CURL_PROXY" -o "\$out" "\$url"
+fi
+EOF
+	else
+		real_wget=$(command -v wget) || die "wget not found"
+		printf '#!/bin/sh\nexec %s %s "$@"\n' "$real_wget" "$NET_FLAGS" > "$WORKDIR/bin/wget"
+	fi
+	chmod 755 "$WORKDIR/bin/wget"
+}
+
+install_deps() {
 	if [ -z "$DEPS_MISSING" ]; then
 		log "dependencies already installed: $DEPS"
 		return 0
 	fi
 	log "installing packages:$DEPS_MISSING"
-	# apk spawns `wget` for downloads and has no IPv4 switch: interpose a
-	# tmpfs wrapper that applies the chosen network mode
-	real_wget=$(command -v wget) || die "wget not found"
-	mkdir -p "$WORKDIR/bin"
-	printf '#!/bin/sh\nexec %s %s "$@"\n' "$real_wget" "$NET_FLAGS" > "$WORKDIR/bin/wget"
-	chmod 755 "$WORKDIR/bin/wget"
+	make_wget_wrapper
 	retry 3 apk_update_q || die "apk update failed (see errors above)"
 	retry 2 apk_add_q || die "apk add failed (see errors above)"
 }
@@ -187,13 +275,13 @@ summary() {
 }
 
 main() {
+	parse_args "$@"
 	log "installer starting (target: OpenWrt >= ${MIN_VERSION})"
 	check_system
+	setup_download
 	collect_missing_deps
 	fetch_source
-	if [ -n "$DEPS_MISSING" ]; then
-		preflight_feeds
-	fi
+	if [ -n "$DEPS_MISSING" ]; then preflight_feeds; fi
 	install_deps
 	install_files
 	activate
